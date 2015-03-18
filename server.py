@@ -137,9 +137,9 @@ def main():
 
     # Create a socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    interface = 'localhost'
+    address = 'localhost'
     port = 8090
-    server_address = (interface,port)
+    server_address = (address,port)
 
     print 'starting up on %s port %s' % server_address
 
