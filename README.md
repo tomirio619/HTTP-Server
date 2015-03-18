@@ -16,3 +16,4 @@ Open up a browser and type some of the following lines in the address bar:
 
 "8090" is the port the server is listening on (can be changed in server.py)
 "localhost" is the address of the server
+Other files can be added to the folder "Content" manually and can also be requested.
