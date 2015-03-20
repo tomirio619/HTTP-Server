@@ -17,3 +17,19 @@ Open up a browser and type some of the following lines in the address bar:
 "8090" is the port the server is listening on (can be changed in server.py)
 "localhost" is the address of the server
 Other files can be added to the folder "Content" manually and can also be requested.
+
+***Usefull links***
+
+http://pymotw.com/2/socket/tcp.html
+https://docs.python.org/3/howto/sockets.html
+https://docs.python.org/2/library/threading.html
+http://www.pythoncentral.io/how-to-create-a-thread-in-python/
+http://www.lagmonster.org/docs/vi.html
+http://stackoverflow.com/questions/4642345/python-client-server-question
+http://stackoverflow.com/questions/4685217/parse-raw-http-headers
+http://pymotw.com/2/BaseHTTPServer/
+http://nullege.com/codes/search/BaseHTTPServer.BaseHTTPRequestHandler.parse_request
+
+***To Do:***
+	- create a test suite using the unittest framework: https://docs.python.org/2/library/unittest.html.
+	- implement all the test scenario's that are specified in the project
