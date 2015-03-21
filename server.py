@@ -78,32 +78,24 @@ def handleRequest(conn, address):
                 parsed_request = HTTPRequest(request)
                 starttime = default_timer()
 
-                print 'Checking if there was an error during parsing the request'
-
                 if parsed_request.error_code is None:
-                    print 'No parse error during parsing'
-                    print 'We check if the path exists'
-                    path = "content" + parsed_request.path
-                    print "het gevraagde pad is %s" % path
                     path = "content" + parsed_request.path
 
                     if os.path.isfile(path):
-                        print 'File exists, sending file back'
                         f = open(path, 'r')
                         sha1 = hashlib.sha1()
                         try:
                             sha1.update(f.read())
                         finally:
                             f.close()
-                        print "we zoeken als er een If-None-Match field aanwezig is"
 
                         if "If-None-Match:" in request:
                             index = request.index("If-None-Match:") + len("If-None-Match:")
                             unparsedETag = request[index:]
-                            ETag = ((unparsedETag.split('\r\n'))[0]).replace('''"''',"")        #split at the \r\n and remove the two quotes surrounding the ETag
-                            print ETag == sha1.hexdigest()
+                            ETag = ((unparsedETag.split('\r\n'))[0]).replace('''"''',"").replace(" ","")        #split at the \r\n and remove the two quotes surrounding the ETag, then remove the whitespaces
+                            print ETag
+                            print sha1.hexdigest()
                             if ETag == sha1.hexdigest():
-                                print "Both ETag values are the same, sending 304 Not Modified back"
                                 if parsed_request.close_connection:
                                     header = '''HTTP/1.1 304 NOT MODIFIED\r\nConnection: close\r\nDate: %s\r\nETag:"%s"\r\nContent-Length: 0\r\n\r\n''' \
                                              % (timestamp(), sha1.hexdigest())
@@ -117,9 +109,7 @@ def handleRequest(conn, address):
                                     conn.sendall(header)
 
                             else:
-                                print "ETag values were not the same, sending back requested file"
                                 f = open(path, 'rb')
-                                print 'de waarde van close connection is %s' % parsed_request.close_connection
 
                                 if parsed_request.close_connection:
                                     header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: close\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
@@ -139,12 +129,9 @@ def handleRequest(conn, address):
                                     conn.sendall(f.read())
 
                         else:
-                            print "No ETag value present, sending back response"
                             f = open(path, 'rb')
-                            print 'de grootte van het bestand is %i' % os.path.getsize(path)
 
                             if parsed_request.close_connection:
-                                print 'we zitten in connection close=1 geval'
                                 header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: close\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
                                          % (parseMessageFormat(parsed_request.path), timestamp(), os.path.getsize(path),
                                             sha1.hexdigest())
@@ -162,7 +149,6 @@ def handleRequest(conn, address):
 
 
                     else:
-                        print 'File doesnt exist'
                         if parsed_request.close_connection:
                             header = '''HTTP/1.1 404 NOT FOUND\r\nConnection:close\r\nDate:%s\r\nContent-Length: 0\r\n\r\n''' % timestamp()
                             conn.sendall(header)
@@ -175,8 +161,6 @@ def handleRequest(conn, address):
                             conn.sendall(header)
 
                 else:
-                    print 'error %s during parsing, %s' % (parsed_request.error_code, parsed_request.error_message)
-
                     if parsed_request.close_connection:
                         header = '''HTTP/1.1 %s %s\r\nConnection: close\r\nContent-Length: 0\r\n\r\n''' % (
                             parsed_request.error_code, parsed_request.error_message)
@@ -210,11 +194,9 @@ def handleRequest(conn, address):
 # The server will accept incoming connections and spawn a thread that will handle the requests for that client.
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 def main():
-    print 'waiting for a connection'
     address = 'localhost'
     port = 8091
     server_address = (address, port)
-    print 'starting up on %s port %s' % server_address
     sock.bind(server_address)
     sock.listen(5)
     while True:

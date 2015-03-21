@@ -69,7 +69,7 @@ class Test(unittest.TestCase):
 
         message = '''GET /hello_world.gif HTTP/1.1\r\n
 		Connection: keep-alive\r\n
-		If-None-Match:"67cd6987484c37bb50e95b8f091bf3c75d230757"\r\n\r\n
+		If-None-Match: "67cd6987484c37bb50e95b8f091bf3c75d230757"\r\n\r\n
 	     '''
 
         print '---- sending message'
