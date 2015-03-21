@@ -90,9 +90,9 @@ def handleRequest(conn, address):
                             f.close()
 
                         if "If-None-Match:" in request:
-                            index = request.index("If-None-Match:") + len("If-None-Match:")
+                            index = request.index("If-None-Match:") + len("If-None-Match:") + 1
                             unparsedETag = request[index:]
-                            ETag = ((unparsedETag.split('\r\n'))[0]).replace('''"''',"").replace(" ","")        #split at the \r\n and remove the two quotes surrounding the ETag, then remove the whitespaces
+                            ETag = ((unparsedETag.split('\r\n'))[0]).replace('''"''',"")       #split at the \r\n and remove the two quotes surrounding the ETag
                             print ETag
                             print sha1.hexdigest()
                             if ETag == sha1.hexdigest():
