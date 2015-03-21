@@ -20,7 +20,6 @@ from timeit import default_timer
 
 
 class HTTPRequest(BaseHTTPRequestHandler):
-
     def __init__(self, request_text):
         self.rfile = StringIO(request_text)
         self.raw_requestline = self.rfile.readline()
@@ -38,6 +37,7 @@ class HTTPRequest(BaseHTTPRequestHandler):
         self.error_code = code
         self.error_message = message
 
+
 # Generates a timestamp according to the HTTP standard
 def timestamp():
     t = time.time()
@@ -53,8 +53,14 @@ def parseMessageFormat(path):
         return "image/gif; charset=UTF-8"
     elif path.endswith(".png"):
         return "image/png; charset=UTF-8"
-    elif path.endswith("image/jpeg"):
+    elif path.endswith(".jpeg"):
         return "image/jpeg; charset=UTF-8"
+    elif path.endswith(".jpg"):
+        return "image/jpg; charset=UTF-8"
+    elif path.endswith(".BMP"):
+        return "image/bmp; charset=UTF-8"
+    elif path.endswith(".bmp"):
+        return "image/bmp; charset=UTF-8"
     else:
         return "text/html; charset=UTF-8"
 
@@ -92,23 +98,22 @@ def handleRequest(conn, address):
                         print "we zoeken als er een If-None-Match field aanwezig is"
 
                         if "If-None-Match:" in request:
-                            index = request.index("If-None-Match:") + len("If-None-Match:") + 1
+                            index = request.index("If-None-Match:") + len("If-None-Match:")
                             unparsedETag = request[index:]
-                            ETag = unparsedETag.replace('''"''', "")
-                            print "The following ETag is present: %s" % ETag
-
+                            ETag = ((unparsedETag.split('\r\n'))[0]).replace('''"''',"")        #split at the \r\n and remove the two quotes surrounding the ETag
+                            print ETag == sha1.hexdigest()
                             if ETag == sha1.hexdigest():
                                 print "Both ETag values are the same, sending 304 Not Modified back"
                                 if parsed_request.close_connection:
                                     header = '''HTTP/1.1 304 NOT MODIFIED\r\nConnection: close\r\nDate: %s\r\nETag:"%s"\r\nContent-Length: 0\r\n\r\n''' \
-                                         % (timestamp(), sha1.hexdigest())
+                                             % (timestamp(), sha1.hexdigest())
                                     conn.sendall(header)
                                     conn.close()
                                     break
 
                                 else:
                                     header = '''HTTP/1.1 304 NOT MODIFIED\r\nConnection: keep-alive\r\nKeep-Alive: timeout=%i\r\nDate: %s\r\nETag:"%s"\r\nContent-Length: 0\r\n\r\n''' \
-                                    % (timeout, timestamp(), sha1.hexdigest())
+                                             % (timeout, timestamp(), sha1.hexdigest())
                                     conn.sendall(header)
 
                             else:
@@ -118,7 +123,9 @@ def handleRequest(conn, address):
 
                                 if parsed_request.close_connection:
                                     header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: close\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
-                                             % (parseMessageFormat(parsed_request.path), timestamp(), os.path.getsize(path), sha1.hexdigest())
+                                             % (
+                                        parseMessageFormat(parsed_request.path), timestamp(), os.path.getsize(path),
+                                        sha1.hexdigest())
                                     conn.sendall(header)
                                     conn.sendall(f.read())
                                     conn.close()
@@ -140,7 +147,7 @@ def handleRequest(conn, address):
                                 print 'we zitten in connection close=1 geval'
                                 header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: close\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
                                          % (parseMessageFormat(parsed_request.path), timestamp(), os.path.getsize(path),
-                                          sha1.hexdigest())
+                                            sha1.hexdigest())
                                 conn.sendall(header)
                                 conn.sendall(f.read())
                                 conn.close()
@@ -149,7 +156,7 @@ def handleRequest(conn, address):
                             else:
                                 header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: keep-alive\r\nKeep-Alive: timeout=%i\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
                                          % (parseMessageFormat(parsed_request.path), timeout, timestamp(),
-                                          os.path.getsize(path), sha1.hexdigest())
+                                            os.path.getsize(path), sha1.hexdigest())
                                 conn.sendall(header)
                                 conn.sendall(f.read())
 
@@ -201,11 +208,11 @@ def handleRequest(conn, address):
 # The main function of the HTTPServer.
 # A socket will be created on the specified address and port.
 # The server will accept incoming connections and spawn a thread that will handle the requests for that client.
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 def main():
     print 'waiting for a connection'
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     address = 'localhost'
-    port = 8090
+    port = 8091
     server_address = (address, port)
     print 'starting up on %s port %s' % server_address
     sock.bind(server_address)
@@ -214,6 +221,7 @@ def main():
         connection, client_address = sock.accept()
         t = Thread(target=handleRequest, args=(connection, client_address))
         t.start()
+
 
 if __name__ == "__main__":
     main()
