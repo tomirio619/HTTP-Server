@@ -1,0 +1,114 @@
+# HTTP-Server
+Justin Mol (s4386094) & Tom Sandmann (s4330048)
+
+
+***Get Request HTTP Server***
+
+
+**Preface**
+Due to time shortage, I was not able to create the desired structure for the project.
+Both test.py and server.py have a variable called port that must be the same in order to run.
+Because test.py imports the server, it uses the specified port in server.py.
+For the same reason I don't have start_tests.sh and start_server.sh.
+At the last moment I realized that the content folder and the server.py were not in the same folder. 
+I discovered this too late so in order to work the content folder must be in the same folder as the server.py, then everything will work :).
+
+
+**IMPORTANT**
+Everything was tested under Windows 8, using PyCharm (Python IDE) and Python version 2.7.9 for Windows.
+Except for the test that would test pipelining (we skipped this test because we had no time implementing pipelining)
+every test succeeded in a reasonable amount of time (also see the image provided in the project).
+
+In order for PyCharm to see Python as an interpreter, you have to edit your Environment Variables:
+My Computer -> Properties -> Advanced -> Environment Variables
+Scroll down until you reach the variable "Path".
+Select and edit it.
+Add C:\Python27; (assuming the default installation) as a value of variable.
+
+
+**Introduction**
+This is a simple HTTP Server written in python.
+It sets up a server that binds to localhost on a port (default 8090).
+Clients that connect to the socket can send HTTP GET Requests (HTTP 1.1).
+The server will parse and send corresponding responses.
+The folder "Content" contains the files that are available to the server.
+
+
+**How to run it?**
+just start the server (python server.py), then start the test(python test.py).
+This will run all the tests.
+
+Open up a browser and type some of the following lines in the address bar (when the server alone is running):
+- http://localhost:PORT/wiki_hash_page.html
+- http://localhost:PORT/hello_world.gif
+- http://localhost:PORT/mp3/mp3.mp3
+- http://localhost:PORT/Eik.jpg
+...
+
+Where PORT is the value of the port the server is running on.
+All files and directories in /content/ can be requested.
+(Default value of PORT is 8090
+
+
+**Implementation**
+Our server implementation is very straight forward.
+First a socket will be created, which will bind to the specified port (default 8090).
+It will listen on this port. For every client that connects, it will dispatch a thread
+that will handle the requests the client is about to send. This will be explained in more detail further on.
+When a clients specifies 'close-connection' in the 'Connection' field, the connection between this thread and
+the client will be closed. If the timeout value is exceeded, the connection will also close.
+
+When the clients sends a GET request, it will be received and parsed by the HTTPrequest class.
+We then check if there was an error during parsing. If the result is none, no error was encountered.
+Otherwise an error was encountered and a response with the corresponding error code along with some information will be send
+back to the client. If the response was parsed without errors, we will check if the requested path exists.
+If so, we check if there was an ETag value present. If this is the case, we will verify if the current ETag of the file is the same
+as the specified one. If these are not the same, an 200 OK will be send with the file and with the corresponding ETag.
+If both ETag values were the same, a 301 NOT MODIFIED will be send back.
+
+For generating the ETag values for requested files, SHA1 is used.
+Although it is a bit overkill, it works fine and it is easy in use.
+
+If the specified path was not a file, we check if it could've been a direction.
+If it is an existing path, we check if the index.html file is present in that direction.
+If that is the case, we send a 200 OK back along with the index.html present in that direction.
+If the direction did not contain the index.html file, we return a 404 NOT FOUND.
+
+We now determine if the connection must remain open or closed.
+If it must be closed, we will close the connection and break out of the 'while true' loop in the thread.
+This will close the thread.
+If it must remain the next time it enters the 'while true' loop, it will wait at the select.select statement.
+If there is something to read, we will read. If there is not and the specified timeout value is reached,
+we also close the connection.
+
+Due to time shortage, we were not able to implement pipelining although it is not that hard to implement.
+Each block of information can consist of multiple request glued together. You must split those request (split at \r\n\r\n)
+and handle each request independently. Because we skipped this part, we also skipped the test case that verifies if the
+server can handle multiple simultaneous requests. It would be pointless to test something you have not implemented.
+
+The testing part was also written in the same language as the server (Python).
+We used the recommended framework unittest. At first we thought we had to run the server as a thread
+in the tests, in order to start the test cases. This was not a good idea, because this approach gave
+us a lot of errors. Then we decided that our precondition for the test was that the server was already running.
+This made it a lot easier to make the tests.
+
+
+**Struggles**
+Both my partner and I were new to socket programming in Python.
+We had to use Google a lot in order make something that worked.
+After the server could listen to the specified port and the client and server
+could communicate with each other, it was not that hard. We used some standard libraries (modified BaseHTTPRequestHandler) for parsing the request
+and some string manipulation to retrieve some specific information from the request and build the corresponding headers.
+It was a fun thing to do!
+
+
+**Links used for development**
+http://pymotw.com/2/socket/tcp.html
+https://docs.python.org/3/howto/sockets.html
+https://docs.python.org/2/library/threading.html
+http://www.pythoncentral.io/how-to-create-a-thread-in-python/
+http://www.lagmonster.org/docs/vi.html
+http://stackoverflow.com/questions/4642345/python-client-server-question
+http://stackoverflow.com/questions/4685217/parse-raw-http-headers
+http://pymotw.com/2/BaseHTTPServer/
+http://nullege.com/codes/search/BaseHTTPServer.BaseHTTPRequestHandler.parse_request

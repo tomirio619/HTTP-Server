@@ -1,16 +1,16 @@
 #!/usr/bin/python
+__author__ = 'Justin Mol (s4386094) & Tom Sandmann (s4330048)'
+
 import socket
-import sys
-import BaseHTTPServer
 import hashlib
 from threading import Thread
-from urlparse import urlparse
 from BaseHTTPServer import BaseHTTPRequestHandler
 from StringIO import StringIO
 import os.path
 import time
-import re
-from timeit import default_timer
+import mimetypes
+import select
+
 
 # BaseHTTPRequestHandler is used to handle the HTTP requests that arrive at the server.
 # By itself, it cannot respond to any actual HTTP requests.
@@ -49,34 +49,25 @@ def timestamp():
 
 # Given the path of a request, it will determine the Content-Type of the response
 def parseMessageFormat(path):
-    if path.endswith(".gif"):
-        return "image/gif; charset=UTF-8"
-    elif path.endswith(".png"):
-        return "image/png; charset=UTF-8"
-    elif path.endswith(".jpeg"):
-        return "image/jpeg; charset=UTF-8"
-    elif path.endswith(".jpg"):
-        return "image/jpg; charset=UTF-8"
-    elif path.endswith(".BMP"):
-        return "image/bmp; charset=UTF-8"
-    elif path.endswith(".bmp"):
-        return "image/bmp; charset=UTF-8"
-    else:
-        return "text/html; charset=UTF-8"
+    return mimetypes.guess_type(path)[0]
 
 
 # A thread will be dispatched to handle the client that connects to the server.
 # It will parse the request (using the HTTPRequest class) and send a response.
 # Both the address and the socket will be passed to this method, so that the thread can send data over this socket
 def handleRequest(conn, address):
-    starttime = default_timer()
     timeout = 5
+    print 'thread started for %s %s' % address
     while True:
         try:
-            request = conn.recv(1024)
-            if request:
+            ready_to_read, ready_to_write, in_error = select.select([conn], [], [], 5)
+            if len(ready_to_read)+len(ready_to_write)+len(in_error) == 0:
+                print 'Connection Timed Out'
+                conn.close()
+                break
+            elif len(ready_to_read) > 0:
+                request = conn.recv(1024)
                 parsed_request = HTTPRequest(request)
-                starttime = default_timer()
 
                 if parsed_request.error_code is None:
                     path = "content" + parsed_request.path
@@ -92,9 +83,7 @@ def handleRequest(conn, address):
                         if "If-None-Match:" in request:
                             index = request.index("If-None-Match:") + len("If-None-Match:") + 1
                             unparsedETag = request[index:]
-                            ETag = ((unparsedETag.split('\r\n'))[0]).replace('''"''',"")       #split at the \r\n and remove the two quotes surrounding the ETag
-                            print ETag
-                            print sha1.hexdigest()
+                            ETag = ((unparsedETag.split('\r\n'))[0]).replace('''"''', "")
                             if ETag == sha1.hexdigest():
                                 if parsed_request.close_connection:
                                     header = '''HTTP/1.1 304 NOT MODIFIED\r\nConnection: close\r\nDate: %s\r\nETag:"%s"\r\nContent-Length: 0\r\n\r\n''' \
@@ -113,42 +102,86 @@ def handleRequest(conn, address):
 
                                 if parsed_request.close_connection:
                                     header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: close\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
-                                             % (
-                                        parseMessageFormat(parsed_request.path), timestamp(), os.path.getsize(path),
-                                        sha1.hexdigest())
-                                    conn.sendall(header)
-                                    conn.sendall(f.read())
+                                             % (parseMessageFormat(path), timestamp(), os.path.getsize(path), sha1.hexdigest())
+                                    conn.sendall(header + f.read())
                                     conn.close()
                                     break
 
                                 else:
                                     header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: keep-alive\r\nKeep-Alive: timeout=%i\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
-                                             % (parseMessageFormat(parsed_request.path), timeout, timestamp(),
+                                             % (parseMessageFormat(path), timeout, timestamp(),
                                                 os.path.getsize(path), sha1.hexdigest())
-                                    conn.sendall(header)
-                                    conn.sendall(f.read())
+                                    conn.sendall(header + f.read())
 
                         else:
+
                             f = open(path, 'rb')
 
                             if parsed_request.close_connection:
                                 header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: close\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
-                                         % (parseMessageFormat(parsed_request.path), timestamp(), os.path.getsize(path),
+                                         % (parseMessageFormat(path), timestamp(), os.path.getsize(path),
                                             sha1.hexdigest())
-                                conn.sendall(header)
-                                conn.sendall(f.read())
+                                conn.sendall(header + f.read())
                                 conn.close()
                                 break
 
                             else:
                                 header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: keep-alive\r\nKeep-Alive: timeout=%i\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
-                                         % (parseMessageFormat(parsed_request.path), timeout, timestamp(),
+                                         % (parseMessageFormat(path), timeout, timestamp(),
                                             os.path.getsize(path), sha1.hexdigest())
-                                conn.sendall(header)
-                                conn.sendall(f.read())
-
+                                conn.sendall(header + f.read())
 
                     else:
+                        value = False
+                        try:
+                            value = os.path.isdir(path)
+                        except:
+                            pass
+
+                        if value:
+                            if os.path.isfile(path+"index.html"):
+                                location = path + "index.html"
+                                f = open(location, 'rb')
+                                sha1 = hashlib.sha1()
+                                sha1.update(f.read())
+                                f.close()
+                                f = open(location, 'rb')
+                                if parsed_request.close_connection:
+                                    header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection:close\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
+                                             % (parseMessageFormat(location), timestamp(), os.path.getsize(location), sha1.hexdigest())
+                                    conn.sendall(header + f.read())
+                                    conn.close()
+                                    break
+
+                                else:
+                                    header = '''HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection:keep-alive\r\nKeep-Alive:timeout=%i\r\nDate:%s\r\nContent-Length: %i\r\nETag:"%s"\r\n\r\n''' \
+                                             % (parseMessageFormat(location), timeout, timestamp(), os.path.getsize(location), sha1.hexdigest())
+                                    conn.sendall(header + f.read())
+
+                            else:
+                                if parsed_request.close_connection:
+                                    header = '''HTTP/1.1 404 NOT FOUND\r\nConnection:close\r\nDate:%s\r\nContent-Length: 0\r\n\r\n''' % timestamp()
+                                    conn.sendall(header)
+                                    conn.close()
+                                    break
+
+                                else:
+                                    header = '''HTTP/1.1 404 NOT FOUND\r\nConnection:keep-alive\r\nKeep-Alive:timeout=%i\r\nDate:%s\r\nContent-Length: 0\r\n\r\n''' \
+                                             % (timeout, timestamp())
+                                    conn.sendall(header)
+
+                        else:
+                            if parsed_request.close_connection:
+                                header = '''HTTP/1.1 404 NOT FOUND\r\nConnection:close\r\nDate:%s\r\nContent-Length: 0\r\n\r\n''' % timestamp()
+                                conn.sendall(header)
+                                conn.close()
+                                break
+
+                            else:
+                                header = '''HTTP/1.1 404 NOT FOUND\r\nConnection:keep-alive\r\nKeep-Alive:timeout=%i\r\nDate:%s\r\nContent-Length: 0\r\n\r\n''' \
+                                         % (timeout, timestamp())
+                                conn.sendall(header)
+
                         if parsed_request.close_connection:
                             header = '''HTTP/1.1 404 NOT FOUND\r\nConnection:close\r\nDate:%s\r\nContent-Length: 0\r\n\r\n''' % timestamp()
                             conn.sendall(header)
@@ -174,28 +207,23 @@ def handleRequest(conn, address):
                         conn.sendall(header)
 
             else:
-                time_waited = int(default_timer() - starttime)
-                if time_waited >= timeout:
-                    conn.close()
-                    print 'timeout ', address
-                    break
-        except:
-            time_waited = default_timer() - starttime
-            if int(time_waited) >= timeout:
-                conn.close()
-                print 'timeout ', address
-                break
-            else:
                 pass
+        except:
+            print 'Connection Timed Out, closing connection'
+            conn.close()
+            break
 
 
 # The main function of the HTTPServer.
 # A socket will be created on the specified address and port.
 # The server will accept incoming connections and spawn a thread that will handle the requests for that client.
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+port = 8090
+
+
 def main():
+    print 'starting server'
     address = 'localhost'
-    port = 8091
     server_address = (address, port)
     sock.bind(server_address)
     sock.listen(5)
@@ -204,8 +232,5 @@ def main():
         t = Thread(target=handleRequest, args=(connection, client_address))
         t.start()
 
-
 if __name__ == "__main__":
     main()
-
-
